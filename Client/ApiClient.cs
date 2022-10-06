@@ -41,14 +41,14 @@ namespace CyberSource.Client
         /// Allows for extending request processing for <see cref="ApiClient"/> generated code.
         /// </summary>
         /// <param name="request">The RestSharp request object</param>
-        partial void InterceptRequest(IRestRequest request);
+        partial void InterceptRequest(RestRequest request);
 
         /// <summary>
         /// Allows for extending response processing for <see cref="ApiClient"/> generated code.
         /// </summary>
         /// <param name="request">The RestSharp request object</param>
         /// <param name="response">The RestSharp response object</param>
-        partial void InterceptResponse(IRestRequest request, IRestResponse response);
+        partial void InterceptResponse(RestRequest request, RestResponse response);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ApiClient" /> class
@@ -86,7 +86,7 @@ namespace CyberSource.Client
         /// <param name="basePath">The base path.</param>
         public ApiClient(string basePath = "https://apitest.cybersource.com")
         {
-           if (string.IsNullOrEmpty(basePath))
+            if (string.IsNullOrEmpty(basePath))
                 throw new ArgumentException("basePath cannot be empty");
 
             RestClient = new RestClient(basePath);
@@ -156,11 +156,11 @@ namespace CyberSource.Client
                     firstQueryParam = false;
                 }
             }
-            
+
             var request = new RestRequest(path, method);
 
             // add path parameter, if any
-            foreach(var param in pathParams)
+            foreach (var param in pathParams)
                 request.AddParameter(param.Key, param.Value, ParameterType.UrlSegment);
 
             // add header parameter, if any
@@ -174,7 +174,7 @@ namespace CyberSource.Client
                 }
                 else
                     request.AddHeader(param.Key, param.Value);
-            }            
+            }
 
             if (postBody == null)
             {
@@ -201,13 +201,13 @@ namespace CyberSource.Client
             //     request.AddQueryParameter(param.Key, param.Value);
 
             // add form parameter, if any
-            foreach(var param in formParams)
+            foreach (var param in formParams)
                 request.AddParameter(param.Key, param.Value);
 
             // add file parameter, if any
-            foreach(var param in fileParams)
+            foreach (var param in fileParams)
             {
-                request.AddFile(param.Value.Name, param.Value.Writer, param.Value.FileName, param.Value.ContentLength, param.Value.ContentType);
+                request.AddFile(param.Value.Name, param.Value.GetFile, param.Value.FileName, param.Value.ContentType, param.Value.Options);
             }
 
             if (postBody != null) // http body (model or byte[]) parameter
@@ -225,7 +225,7 @@ namespace CyberSource.Client
                     else
                     {
                         request.AddParameter("application/json", postBody, ParameterType.RequestBody);
-                    }                    
+                    }
                 }
                 else if (postBody.GetType() == typeof(byte[]))
                 {
@@ -263,7 +263,7 @@ namespace CyberSource.Client
             }
 
             //initiate a HttpWebRequest object
-            HttpWebRequest requestT = (HttpWebRequest)WebRequest.Create(Uri.EscapeUriString("https://" + RestClient.BaseUrl.Host + path));
+            HttpWebRequest requestT = (HttpWebRequest)WebRequest.Create(Uri.EscapeUriString("https://" + RestClient.Options.BaseUrl.Host + path));
             requestT.UserAgent = Configuration.UserAgent;
 
             if (Configuration.Proxy != null)
@@ -334,7 +334,7 @@ namespace CyberSource.Client
         {
             //declared separately to handle both regular call and download file calls
             int httpResponseStatusCode;
-            IList<Parameter> httpResponseHeaders = null;
+            IList<HeaderParameter> httpResponseHeaders = null;
             string httpResponseData = string.Empty;
 
             LogUtility logUtility = new LogUtility();
@@ -357,19 +357,18 @@ namespace CyberSource.Client
                     pathParams, contentType);
 
                 // set timeout
-                RestClient.Timeout = Configuration.Timeout;
+                RestClient.Options.MaxTimeout = Configuration.Timeout;
                 // set user agent
-                RestClient.UserAgent = Configuration.UserAgent;
-            
-                RestClient.ClearHandlers();
+                RestClient.Options.UserAgent = Configuration.UserAgent;
+
 
                 if (Configuration.Proxy != null)
                 {
-                    RestClient.Proxy = Configuration.Proxy;
-                }            
-                
+                    RestClient.Options.Proxy = Configuration.Proxy;
+                }
+
                 // Adding Client Cert
-                if(Configuration.MerchantConfigDictionaryObj.ContainsKey("enableClientCert") && Equals(bool.Parse(Configuration.MerchantConfigDictionaryObj["enableClientCert"]), true))
+                if (Configuration.MerchantConfigDictionaryObj.ContainsKey("enableClientCert") && Equals(bool.Parse(Configuration.MerchantConfigDictionaryObj["enableClientCert"]), true))
                 {
                     string clientCertDirectory = Configuration.MerchantConfigDictionaryObj["clientCertDirectory"];
                     string clientCertFile = Configuration.MerchantConfigDictionaryObj["clientCertFile"];
@@ -377,7 +376,7 @@ namespace CyberSource.Client
                     string fileName = Path.Combine(clientCertDirectory, clientCertFile);
                     // Importing Certificates
                     var certificate = new X509Certificate2(fileName, clientCertPassword);
-                    RestClient.ClientCertificates = new X509CertificateCollection { certificate };
+                    RestClient.Options.ClientCertificates = new X509CertificateCollection { certificate };
                 }
 
                 // Logging Request Headers
@@ -400,7 +399,7 @@ namespace CyberSource.Client
                 }
 
                 InterceptRequest(request);
-                response = (RestResponse) RestClient.Execute(request);
+                response = (RestResponse)RestClient.Execute(request);
                 InterceptResponse(request, response);
             }
             else
@@ -460,11 +459,6 @@ namespace CyberSource.Client
                     }
                 }
 
-                //setting the generic response with response headers
-                foreach (var header in responseT.Headers)
-                {
-                    response.Headers.Add(new Parameter(header.ToString(), string.Join(",", responseT.Headers.GetValues(header.ToString()).ToArray()), ParameterType.HttpHeader));
-                }
 
                 //setting the generic RestResponse which is returned to the calling class
                 response.StatusCode = responseT.StatusCode;
@@ -486,7 +480,7 @@ namespace CyberSource.Client
 
             // Logging Response Headers
             httpResponseStatusCode = (int)response.StatusCode;
-            httpResponseHeaders = response.Headers;
+            httpResponseHeaders = response.Headers.ToList();
             httpResponseData = response.Content;
 
             logger.Debug($"HTTP Response Status Code: {httpResponseStatusCode}");
@@ -556,17 +550,17 @@ namespace CyberSource.Client
                 }
             }
 
-                if (logUtility.IsMaskingEnabled(logger))
-                {
-                    logger.Debug($"HTTP Request Headers :\n{logUtility.MaskSensitiveData(headerPrintOutput.ToString())}");
-                }
-                else
-                {
-                    logger.Debug($"HTTP Request Headers :\n{headerPrintOutput.ToString()}");
-                }
+            if (logUtility.IsMaskingEnabled(logger))
+            {
+                logger.Debug($"HTTP Request Headers :\n{logUtility.MaskSensitiveData(headerPrintOutput.ToString())}");
+            }
+            else
+            {
+                logger.Debug($"HTTP Request Headers :\n{headerPrintOutput.ToString()}");
+            }
 
             InterceptRequest(request);
-            var response = await RestClient.ExecuteTaskAsync(request);
+            var response = await RestClient.ExecuteAsync(request);
             InterceptResponse(request, response);
 
             // Logging Response Headers
@@ -639,21 +633,24 @@ namespace CyberSource.Client
         /// <returns>Formatted string.</returns>
         public string ParameterToString(object obj)
         {
-            if (obj is DateTime) {
+            if (obj is DateTime)
+            {
                 string outDateTime = null;
 
-                if (((DateTime)obj).TimeOfDay.CompareTo(new TimeSpan(0, 0, 0)) == 0) {
+                if (((DateTime)obj).TimeOfDay.CompareTo(new TimeSpan(0, 0, 0)) == 0)
+                {
                     outDateTime = ((DateTime?)obj).Value.ToString("yyyy-MM-dd");
                 }
                 else
                 {
                     outDateTime = ((DateTime?)obj).Value.ToString("yyyy-MM-ddTHH:mm:ssZ");
                 }
-                
+
                 return outDateTime;
             }
-            else if (obj is DateTimeOffset) {
-                return ((DateTimeOffset)obj).ToString (Configuration.DateTimeFormat);
+            else if (obj is DateTimeOffset)
+            {
+                return ((DateTimeOffset)obj).ToString(Configuration.DateTimeFormat);
             }
             else if (obj is IList)
             {
@@ -667,7 +664,7 @@ namespace CyberSource.Client
                 return flattenedString.ToString();
             }
             else
-                return Convert.ToString (obj);
+                return Convert.ToString(obj);
         }
 
         /// <summary>
@@ -676,9 +673,9 @@ namespace CyberSource.Client
         /// <param name="response">The HTTP response.</param>
         /// <param name="type">Object type.</param>
         /// <returns>Object representation of the JSON string.</returns>
-        public object Deserialize(IRestResponse response, Type type)
+        public object Deserialize(RestResponse response, Type type)
         {
-            IList<Parameter> headers = response.Headers;
+            IList<HeaderParameter> headers = response.Headers.ToList();
             if (type == typeof(byte[])) // return byte array
             {
                 return response.RawBytes;
@@ -707,9 +704,9 @@ namespace CyberSource.Client
                 return stream;
             }
 
-            if ( type == typeof(DateTime?)) // return a datetime object
+            if (type == typeof(DateTime?)) // return a datetime object
             {
-                return DateTime.Parse(response.Content,  null, System.Globalization.DateTimeStyles.RoundtripKind);
+                return DateTime.Parse(response.Content, null, System.Globalization.DateTimeStyles.RoundtripKind);
             }
 
             if (type == typeof(string) || type.Name.StartsWith("System.Nullable")) // return primitive type
@@ -813,7 +810,7 @@ namespace CyberSource.Client
         /// <returns>Byte array</returns>
         public static byte[] ReadAsBytes(Stream input)
         {
-            byte[] buffer = new byte[16*1024];
+            byte[] buffer = new byte[16 * 1024];
             using (MemoryStream ms = new MemoryStream())
             {
                 int read;
@@ -879,7 +876,7 @@ namespace CyberSource.Client
                 return filename;
             }
         }
-        
+
         /// <summary>
         /// Generate Request Authentication Headers using the Authentication SDK
         /// </summary>
@@ -936,7 +933,7 @@ namespace CyberSource.Client
             // {
             //     authenticationHeaders.Add("v-c-solution-id", Configuration.SolutionId);
             // }
-            
+
             if (Configuration.Proxy == null && merchantConfig.UseProxy != null)
             {
                 if (bool.Parse(merchantConfig.UseProxy))
@@ -958,10 +955,10 @@ namespace CyberSource.Client
             //Set the Configuration
             Configuration.DefaultHeader = authenticationHeaders;
             RestClient = new RestClient("https://" + merchantConfig.HostName);
-            
+
             if (Configuration.Proxy != null)
             {
-                RestClient.Proxy = Configuration.Proxy;
+                RestClient.Options.Proxy = Configuration.Proxy;
             }
         }
     }

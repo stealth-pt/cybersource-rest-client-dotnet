@@ -136,7 +136,7 @@ namespace CyberSource.Client
         /// </summary>
         public static readonly ExceptionFactory DefaultExceptionFactory = (methodName, response) =>
         {
-            int status = (int) response.StatusCode;
+            int status = (int)response.StatusCode;
             if (status >= 400) return new ApiException(status, String.Format("Error calling {0}: {1}", methodName, response.Content), response.Content);
             if (status == 0) return new ApiException(status, String.Format("Error calling {0}: {1}", methodName, response.ErrorMessage), response.ErrorMessage);
             return null;
@@ -148,12 +148,12 @@ namespace CyberSource.Client
         /// <value>Timeout.</value>
         public int Timeout
         {
-            get { return ApiClient.RestClient.Timeout; }
+            get { return ApiClient.RestClient.Options.MaxTimeout; }
 
             set
             {
                 if (ApiClient != null)
-                    ApiClient.RestClient.Timeout = value;
+                    ApiClient.RestClient.Options.MaxTimeout = value;
             }
         }
 
@@ -168,23 +168,23 @@ namespace CyberSource.Client
         /// </summary>
         /// <param name="apiClient">An instance of ApiClient.</param>
         /// <returns></returns>
-        public void SetApiClientUsingDefault (ApiClient apiClient = null)
+        public void SetApiClientUsingDefault(ApiClient apiClient = null)
         {
             // if (apiClient == null)
             // {
-                // if (Default != null && Default.ApiClient == null)
-                    // Default.ApiClient = new ApiClient();
+            // if (Default != null && Default.ApiClient == null)
+            // Default.ApiClient = new ApiClient();
 
-                // ApiClient = Default != null ? Default.ApiClient : new ApiClient();
+            // ApiClient = Default != null ? Default.ApiClient : new ApiClient();
             // }
             // else
             // {
-                // if (Default != null && Default.ApiClient == null)
-                    // Default.ApiClient = apiClient;
+            // if (Default != null && Default.ApiClient == null)
+            // Default.ApiClient = apiClient;
 
-                // ApiClient = apiClient;
+            // ApiClient = apiClient;
             // }
-            
+
             if (apiClient == null)
             {
                 ApiClient = new ApiClient();
@@ -240,13 +240,13 @@ namespace CyberSource.Client
         {
             Proxy = proxy;
         }
-        
+
         /// <summary>
         /// Gets or sets the Merchant Config Dictionary Object (key/value pairs).
         /// </summary>
         /// <value>Merchant Config Dictionary Object</value>
         public IReadOnlyDictionary<string, string> MerchantConfigDictionaryObj { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the HTTP user agent.
         /// </summary>
@@ -306,10 +306,10 @@ namespace CyberSource.Client
         /// </summary>
         /// <param name="apiKeyIdentifier">API key identifier (authentication scheme).</param>
         /// <returns>API key with prefix.</returns>
-        public string GetApiKeyWithPrefix (string apiKeyIdentifier)
+        public string GetApiKeyWithPrefix(string apiKeyIdentifier)
         {
             ApiKey.TryGetValue(apiKeyIdentifier, out string apiKeyValue);
-            if (ApiKeyPrefix.TryGetValue (apiKeyIdentifier, out string apiKeyPrefix))
+            if (ApiKeyPrefix.TryGetValue(apiKeyIdentifier, out string apiKeyPrefix))
                 return apiKeyPrefix + " " + apiKeyValue;
             else
                 return apiKeyValue;
@@ -349,7 +349,7 @@ namespace CyberSource.Client
                 if (value[value.Length - 1] == Path.DirectorySeparatorChar)
                     _tempFolderPath = value;
                 else
-                    _tempFolderPath = value  + Path.DirectorySeparatorChar;
+                    _tempFolderPath = value + Path.DirectorySeparatorChar;
             }
         }
 
@@ -396,7 +396,7 @@ namespace CyberSource.Client
             report += "    .NET Framework Version: " + Assembly
                      .GetExecutingAssembly()
                      .GetReferencedAssemblies()
-                     .Where(x => x.Name == "System.Core").First().Version.ToString()  + "\n";
+                     .Where(x => x.Name == "System.Core").First().Version.ToString() + "\n";
             report += "    Version of the API: 0.0.1\n";
             report += "    SDK Package Version: 1.0.0\n";
 
